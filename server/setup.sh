@@ -48,9 +48,16 @@ else
     ${CONDA} env create -f environment.yaml
 fi
 
-# ── Verify torch + CUDA ─────────────────────────────────────────────
+# ── Install CUDA support on Linux with NVIDIA GPU ────────────────────
+if [[ "$(uname)" == "Linux" ]] && command -v nvidia-smi &> /dev/null; then
+    echo ""
+    echo "--- NVIDIA GPU detected, installing CUDA support ---"
+    ${CONDA} install -n "${ENV_NAME}" -y -c pytorch -c nvidia pytorch-cuda=11.8
+fi
+
+# ── Verify torch + device ───────────────────────────────────────────
 echo ""
-echo "--- Checking GPU ---"
+echo "--- Checking compute device ---"
 run_in_env python -c "
 import torch, numpy
 print(f'numpy:  {numpy.__version__}')
@@ -59,8 +66,10 @@ print(f'CUDA available: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
     print(f'GPU: {torch.cuda.get_device_name(0)}')
     print(f'VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    print(f'MPS (Apple Silicon) available')
 else:
-    print('WARNING: No CUDA GPU detected.')
+    print('No GPU detected, will use CPU.')
 "
 
 # ── Clone TruFor repo ───────────────────────────────────────────────
@@ -81,7 +90,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     mkdir -p weights
     WEIGHTS_ZIP="weights/TruFor_weights.zip"
-    if [ ! -f "weights/trufor.pth.tar" ]; then
+    if [ ! -f "weights/weights/trufor.pth.tar" ]; then
         curl -L -o "${WEIGHTS_ZIP}" "https://www.grip.unina.it/download/prog/TruFor/TruFor_weights.zip"
         unzip -o "${WEIGHTS_ZIP}" -d weights/
         rm -f "${WEIGHTS_ZIP}"
@@ -94,8 +103,6 @@ else
     echo "  curl -L -o weights/TruFor_weights.zip https://www.grip.unina.it/download/prog/TruFor/TruFor_weights.zip"
     echo "  unzip weights/TruFor_weights.zip -d weights/"
 fi
-
-mkdir -p weights
 
 echo ""
 echo "=== Setup complete ==="
