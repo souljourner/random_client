@@ -1,0 +1,9 @@
+model:
+  weight_path: "./weights/weights/trufor.pth.tar"
+  device: "auto"
+  score_threshold: 0.5
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  max_image_size_mb: 20
