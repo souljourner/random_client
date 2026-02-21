@@ -181,8 +181,10 @@ class TruForDetector:
             )
 
         # Clean up device memory
-        del rgb, pred, conf, det, npp
-        if torch.cuda.is_available():
+        del rgb, pred, conf, det, npp, loc_map
+        if self.device == "mps":
+            torch.mps.empty_cache()
+        elif torch.cuda.is_available():
             torch.cuda.empty_cache()
 
         return {"score": score, "explanation": explanation}
