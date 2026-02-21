@@ -1,18 +1,18 @@
-# FakeShield Client — Setup & Usage
+# TruFor Client — Setup & Usage
 
 ## Prerequisites
 
 - macOS (or any machine with network access to the GPU server)
-- [Miniforge](https://github.com/conda-forge/miniforge) installed (`mamba` or `conda` available)
-- Images stored as local files on this machine
-- FakeShield server running and reachable
+- [Miniforge](https://github.com/conda-forge/miniforge) installed (`mamba` available on PATH)
+- Images stored as local files or accessible via URL
+- TruFor server running and reachable
 
 ## 1. Setup
 
 ```bash
 cd client
 mamba env create -f environment.yaml
-conda activate fakeshield_client
+mamba activate fakeshield_client
 ```
 
 To update an existing environment:
@@ -36,19 +36,19 @@ checkpoint_file: "../output/checkpoint.json"
 
 ## 3. Prepare Input CSV
 
-Create a CSV with columns `ticketId` and `image_path`:
+Create a CSV with columns `ticketId` and `image_path`. Paths can be local files or URLs:
 
 ```csv
 ticketId,image_path
 T001,/Users/jzhu/images/photo1.jpg
-T002,/Users/jzhu/images/photo2.png
+T002,https://example.com/photo2.png
 T003,/Users/jzhu/images/nonexistent.jpg
 ```
 
 ## 4. Run
 
 ```bash
-conda activate fakeshield_client
+mamba activate fakeshield_client
 cd client
 python client.py --input ../input/sample.csv
 ```
@@ -87,16 +87,15 @@ Results are written to CSV:
 
 ```csv
 ticketId,image_path,is_altered,explanation,domain_tag
-T001,/path/to/img1.jpg,1.0,"Signs of manipulation...",Photoshop
-T002,/path/to/img2.jpg,0.0,"Image appears authentic.",AIGC inpainting
+T001,/path/to/img1.jpg,0.73,"Detection score 0.73 (threshold 0.5). 12.4% of pixels flagged as potentially manipulated.",
+T002,/path/to/img2.jpg,0.12,"Detection score 0.12 (threshold 0.5). Image appears authentic.",
 T003,/path/to/broken.jpg,-1.0,"[ERROR] File not found",
 ```
 
 | `is_altered` Value | Meaning |
 |---|---|
-| `1.0` | Forged / tampered |
-| `0.0` | Authentic |
-| `-1.0` | Error (file missing, server failure, parse error) |
+| `0.0 - 1.0` | Detection confidence (higher = more likely tampered) |
+| `-1.0` | Error (file missing, server failure) |
 
 ## 6. Checkpoint & Resume
 
@@ -122,4 +121,4 @@ curl -s -X POST http://192.168.4.88:8000/v1/detect \
 **Common errors:**
 - `[ERROR] File not found` — the `image_path` in the CSV doesn't exist; use absolute paths
 - `[ERROR] Connection refused` — server is down or wrong IP; check `config.yaml` and `curl /v1/health`
-- `[ERROR] 503` — server is still loading the model; wait 1-2 minutes and retry
+- `[ERROR] 503` — server is still loading the model; wait a few seconds and retry

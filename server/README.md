@@ -1,10 +1,10 @@
-# FakeShield Detection Server — Setup & Usage
+# TruFor Detection Server — Setup & Usage
 
 ## Prerequisites
 
-- Linux machine with an NVIDIA GPU (tested on RTX 3090 Ti)
-- [Miniforge](https://github.com/conda-forge/miniforge) or Mambaforge installed (`mamba` available on PATH)
-- ~26 GB free disk for model weights, ~30 GB VRAM for 8-bit inference
+- Linux machine with NVIDIA GPU, or macOS with Apple Silicon
+- [Miniforge](https://github.com/conda-forge/miniforge) installed (`mamba` available on PATH)
+- ~500 MB free disk for model weights
 
 ## 1. Initial Setup
 
@@ -14,10 +14,11 @@ bash setup.sh
 ```
 
 This will:
-1. Create a `fakeshield_server` conda environment (Python 3.10, CUDA 11.8, PyTorch 2.1)
-2. Verify GPU is detected and bitsandbytes loads correctly
-3. Clone the FakeShield repo, patch known issues, and install DTE-FDM dependencies
-4. Prompt to download ~26 GB of model weights from HuggingFace
+1. Create a `trufor_server` environment (Python 3.10, PyTorch 2.2+)
+2. Install CUDA support automatically if an NVIDIA GPU is detected
+3. Verify compute device (CUDA, MPS, or CPU)
+4. Clone the TruFor repo
+5. Prompt to download ~200 MB of model weights
 
 To nuke a broken environment and start fresh:
 
@@ -31,28 +32,24 @@ Edit `server/config.yaml` as needed:
 
 ```yaml
 model:
-  weight_path: "./weights/fakeshield-v1-22b/DTE-FDM"   # LLaVA model weights
-  dtg_path: "./weights/fakeshield-v1-22b/DTG.pth"       # ResNet50 domain classifier
-  load_8bit: true                                        # 8-bit quantization (recommended)
-  load_4bit: false
-  device: "cuda:0"
-  temperature: 0.2
-  max_new_tokens: 4096
+  weight_path: "./weights/weights/trufor.pth.tar"
+  device: "auto"           # auto-detects CUDA, MPS, or CPU
+  score_threshold: 0.5
 
 server:
-  host: "0.0.0.0"        # bind address
-  port: 8000              # listen port
-  max_image_size_mb: 20   # reject images larger than this
+  host: "0.0.0.0"          # bind address
+  port: 8000                # listen port
+  max_image_size_mb: 20     # reject images larger than this
 ```
 
-You can also override the config path via the `FAKESHIELD_CONFIG` environment variable.
+You can also override the config path via the `TRUFOR_CONFIG` environment variable.
 
 ## 3. Start the Server
 
 ```bash
 cd server
-conda activate fakeshield_server
-export PYTHONPATH="${PWD}/FakeShield/DTE-FDM:${PYTHONPATH:-}"
+mamba activate trufor_server
+export PYTHONPATH="${PWD}/TruFor/test_docker/src:${PYTHONPATH:-}"
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
@@ -60,12 +57,12 @@ Or equivalently:
 
 ```bash
 cd server
-conda activate fakeshield_server
-export PYTHONPATH="${PWD}/FakeShield/DTE-FDM:${PYTHONPATH:-}"
+mamba activate trufor_server
+export PYTHONPATH="${PWD}/TruFor/test_docker/src:${PYTHONPATH:-}"
 python server.py
 ```
 
-On startup, the server loads the DTG (ResNet50) and DTE-FDM (LLaVA 13B) models into GPU memory. This takes 1-2 minutes. The server begins accepting requests once loading completes.
+On startup, the server loads TruFor (~68.7M params) into device memory. This takes a few seconds. The server begins accepting requests once loading completes.
 
 ## 4. API Endpoints
 
@@ -79,7 +76,7 @@ curl http://localhost:8000/v1/health
 
 Response:
 ```json
-{"status": "ready", "model": "fakeshield-v1-dte-fdm", "device": "cuda:0"}
+{"status": "ready", "model": "trufor-v1", "device": "cuda:0"}
 ```
 
 Returns `503` if the model is still loading.
@@ -102,18 +99,18 @@ Request body:
 Response (200):
 ```json
 {
-  "is_altered": 1.0,
-  "explanation": "The image shows signs of tampering...",
-  "domain_tag": "Photoshop",
-  "model": "fakeshield-v1-dte-fdm"
+  "is_altered": 0.73,
+  "explanation": "Detection score 0.73 (threshold 0.5). 12.4% of pixels flagged as potentially manipulated.",
+  "domain_tag": "",
+  "model": "trufor-v1"
 }
 ```
 
 | Field | Description |
 |---|---|
-| `is_altered` | `1.0` = forged, `0.0` = authentic, `-1.0` = parse error |
-| `explanation` | Model's natural language explanation |
-| `domain_tag` | One of: `AIGC inpainting`, `DeepFake`, `Photoshop` |
+| `is_altered` | Float 0-1. Higher = more likely tampered. `-1.0` on error. |
+| `explanation` | Human-readable summary of detection score and pixel analysis |
+| `domain_tag` | Empty string (TruFor does not classify forgery type) |
 | `model` | Model identifier |
 
 Error codes:
@@ -140,8 +137,8 @@ To run the server in the background:
 
 ```bash
 cd server
-conda activate fakeshield_server
-export PYTHONPATH="${PWD}/FakeShield/DTE-FDM:${PYTHONPATH:-}"
+mamba activate trufor_server
+export PYTHONPATH="${PWD}/TruFor/test_docker/src:${PYTHONPATH:-}"
 nohup uvicorn server:app --host 0.0.0.0 --port 8000 >> server.log 2>&1 &
 ```
 

@@ -11,13 +11,15 @@ for arg in "$@"; do
     esac
 done
 
-# ── Check for mamba/conda ────────────────────────────────────────────
-if command -v mamba &> /dev/null; then
+# ── Check for mamba/micromamba/conda ──────────────────────────────────
+if command -v micromamba &> /dev/null; then
+    CONDA=micromamba
+elif command -v mamba &> /dev/null; then
     CONDA=mamba
 elif command -v conda &> /dev/null; then
     CONDA=conda
 else
-    echo "ERROR: Neither mamba nor conda found. Install Miniforge first."
+    echo "ERROR: No conda/mamba/micromamba found. Install Miniforge first."
     echo "  See: https://github.com/conda-forge/miniforge"
     exit 1
 fi
@@ -25,10 +27,10 @@ echo "Using: ${CONDA}"
 
 ENV_NAME="trufor_server"
 
-# Helper: run a command inside the conda environment
+# Helper: run a command inside the environment
 run_in_env() {
-    conda run -n "${ENV_NAME}" --live-stream "$@" 2>/dev/null \
-        || conda run -n "${ENV_NAME}" "$@"
+    ${CONDA} run -n "${ENV_NAME}" --live-stream "$@" 2>/dev/null \
+        || ${CONDA} run -n "${ENV_NAME}" "$@"
 }
 
 # ── Remove existing env if --clean ───────────────────────────────────
@@ -108,6 +110,6 @@ echo ""
 echo "=== Setup complete ==="
 echo ""
 echo "To start the server:"
-echo "  conda activate ${ENV_NAME}"
+echo "  ${CONDA} activate ${ENV_NAME}"
 echo "  export PYTHONPATH=\"\${PWD}/TruFor/test_docker/src:\${PYTHONPATH:-}\""
 echo "  uvicorn server:app --host 0.0.0.0 --port 8000"
