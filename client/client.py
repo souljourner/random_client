@@ -1,4 +1,4 @@
-"""CLI entry point for FakeShield client — sends images to the detection server."""
+"""CLI entry point for TruFor client — sends images to the detection server."""
 
 import logging
 import os
@@ -19,9 +19,9 @@ from pipeline import run_pipeline
 @click.option("--dry-run", is_flag=True, help="Validate CSV and test image files without sending to server")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging")
 def main(input_csv, output_csv, config_path, limit, no_resume, dry_run, verbose):
-    """FakeShield Client — Send images to the detection server.
+    """TruFor Client — Send images to the detection server.
 
-    Reads a CSV of local image paths, sends each to the FakeShield server,
+    Reads a CSV of local image paths, sends each to the TruFor server,
     and collects forgery scores, explanations, and domain tags into an output CSV.
     """
     # Setup logging

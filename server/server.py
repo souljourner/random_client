@@ -104,8 +104,8 @@ async def detect(req: DetectRequest):
 
         # Validate it's a real image
         try:
-            img = Image.open(tmp_path)
-            img.verify()
+            with Image.open(tmp_path) as img:
+                img.verify()
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid image file")
 

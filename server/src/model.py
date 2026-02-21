@@ -149,7 +149,8 @@ class TruForDetector:
             dict with 'score' (float 0-1) and 'explanation' (str)
         """
         MAX_EDGE = 2048
-        pil_img = Image.open(image_path).convert("RGB")
+        with Image.open(image_path) as _pil_img:
+            pil_img = _pil_img.convert("RGB")
         w, h = pil_img.size
         if max(w, h) > MAX_EDGE:
             scale = MAX_EDGE / max(w, h)

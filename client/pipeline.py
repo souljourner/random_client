@@ -2,9 +2,11 @@
 
 import base64
 import csv
+import io
 import json
 import logging
 import os
+import tempfile
 import time
 
 import requests
@@ -26,7 +28,7 @@ def load_input_csv(path: str) -> list[dict]:
 
 
 def load_checkpoint(path: str) -> set[str]:
-    """Load set of completed ticket IDs from checkpoint file."""
+    """Load set of completed image paths from checkpoint file."""
     if not os.path.exists(path):
         return set()
     with open(path, encoding="utf-8") as f:
@@ -35,15 +37,25 @@ def load_checkpoint(path: str) -> set[str]:
 
 
 def save_checkpoint(path: str, completed: set[str]):
-    """Save completed ticket IDs to checkpoint file."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"completed": sorted(completed)}, f)
+    """Save completed image paths to checkpoint file (atomic write)."""
+    dir_name = os.path.dirname(path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=dir_name or ".", suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump({"completed": sorted(completed)}, f)
+        os.replace(tmp_path, path)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
 
 
 def append_results_csv(path: str, results: list[dict], write_header: bool = False):
     """Append results to output CSV."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    dir_name = os.path.dirname(path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
     mode = "w" if write_header else "a"
     with open(path, mode, newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["ticketId", "image_path", "is_altered", "explanation", "domain_tag"])
@@ -169,14 +181,16 @@ def run_pipeline(
     # 2. Load checkpoint
     if no_resume:
         completed = set()
+        if os.path.exists(checkpoint_path):
+            os.remove(checkpoint_path)
         logger.info("Starting fresh (--no-resume)")
     else:
         completed = load_checkpoint(checkpoint_path)
         logger.info("Checkpoint: %d tickets already processed", len(completed))
 
     # 3. Filter completed
-    pending = [r for r in rows if r["ticketId"] not in completed]
-    logger.info("%d tickets pending", len(pending))
+    pending = [r for r in rows if r["image_path"] not in completed]
+    logger.info("%d images pending", len(pending))
 
     if not pending:
         logger.info("Nothing to process. All tickets already completed.")
@@ -211,8 +225,14 @@ def run_pipeline(
             # In dry-run mode, just validate the file exists and is an image
             try:
                 from PIL import Image
-                img = Image.open(image_path)
-                img.verify()
+                if _is_url(image_path):
+                    image_bytes = _read_image_bytes(image_path)
+                    img = Image.open(io.BytesIO(image_bytes))
+                    img.verify()
+                    img.close()
+                else:
+                    with Image.open(image_path) as img:
+                        img.verify()
                 result = {
                     "ticketId": tid,
                     "image_path": image_path,
@@ -250,7 +270,7 @@ def run_pipeline(
 
         # Write result and checkpoint after each image
         append_results_csv(output_csv, [result])
-        completed.add(tid)
+        completed.add(image_path)
         save_checkpoint(checkpoint_path, completed)
         total_processed += 1
 
