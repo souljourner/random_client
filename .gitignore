@@ -1,0 +1,35 @@
+# --- Project Specific ---
+.claude/
+
+# --- Python & Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+bin/
+# If you use Mamba/Conda environments inside the project folder:
+conda/
+mamba/
+
+# --- AI & Machine Learning ---
+# Ignore large model weights and datasets
+*.bin
+*.pth
+*.onnx
+*.weights
+*.h5
+# Specific to Apple Silicon MLX/Ollama if applicable
+.ollama/
+models/
+
+# --- Operating System ---
+.DS_Store
+Thumbs.db
+
+# --- Editor Specific ---
+.vscode/
+.idea/
+*.swp
