@@ -1,0 +1,6 @@
+server:
+  url: "http://192.168.4.88:8000"
+  timeout: 120
+  retries: 3
+
+checkpoint_file: "../output/checkpoint.json"
