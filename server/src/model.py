@@ -148,7 +148,14 @@ class TruForDetector:
         Returns:
             dict with 'score' (float 0-1) and 'explanation' (str)
         """
-        img = np.array(Image.open(image_path).convert("RGB"))
+        MAX_EDGE = 2048
+        pil_img = Image.open(image_path).convert("RGB")
+        w, h = pil_img.size
+        if max(w, h) > MAX_EDGE:
+            scale = MAX_EDGE / max(w, h)
+            pil_img = pil_img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+            logger.info("Resized %s from %dx%d to %dx%d", image_path, w, h, *pil_img.size)
+        img = np.array(pil_img)
         # HWC -> CHW, divide by 256.0 (matches TruFor training pipeline)
         rgb = torch.tensor(img.transpose(2, 0, 1), dtype=torch.float) / 256.0
         rgb = rgb.unsqueeze(0).to(self.device)
